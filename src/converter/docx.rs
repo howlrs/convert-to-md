@@ -37,6 +37,12 @@ struct State {
     in_del: bool,
     heading_level: Option<usize>,
     current_para: String,
+    // table state
+    in_table: bool,
+    in_cell: bool,
+    current_cell: String,
+    current_row: Vec<String>,
+    table_row_idx: usize,
 }
 
 impl State {
@@ -47,6 +53,11 @@ impl State {
             in_del: false,
             heading_level: None,
             current_para: String::new(),
+            in_table: false,
+            in_cell: false,
+            current_cell: String::new(),
+            current_row: Vec::new(),
+            table_row_idx: 0,
         }
     }
 }
@@ -71,6 +82,17 @@ fn style_to_level(val: &str) -> Option<usize> {
 
 fn handle_open(e: &quick_xml::events::BytesStart<'_>, state: &mut State) {
     match e.name().as_ref() {
+        b"w:tbl" => {
+            state.in_table = true;
+            state.table_row_idx = 0;
+        }
+        b"w:tr" => {
+            state.current_row.clear();
+        }
+        b"w:tc" => {
+            state.in_cell = true;
+            state.current_cell.clear();
+        }
         b"w:p" => {
             state.in_para = true;
             state.current_para.clear();
@@ -102,9 +124,44 @@ fn parse_document_xml(xml: &str) -> Result<String> {
             Event::Start(e) => handle_open(&e, &mut state),
             Event::Empty(e) => handle_open(&e, &mut state),
             Event::End(e) => match e.name().as_ref() {
+                b"w:tbl" => {
+                    state.in_table = false;
+                    state.in_cell = false;
+                    state.table_row_idx = 0;
+                    output.push('\n');
+                }
+                b"w:tr" => {
+                    if !state.current_row.is_empty() {
+                        output.push_str(&format!("|{}|\n", state.current_row.join("|")));
+                        if state.table_row_idx == 0 {
+                            let sep = state
+                                .current_row
+                                .iter()
+                                .map(|_| "---")
+                                .collect::<Vec<_>>()
+                                .join("|");
+                            output.push_str(&format!("|{}|\n", sep));
+                        }
+                        state.table_row_idx += 1;
+                    }
+                    state.current_row.clear();
+                }
+                b"w:tc" => {
+                    let cell = state.current_cell.replace('|', "\\|");
+                    state.current_row.push(cell.trim().to_string());
+                    state.current_cell.clear();
+                    state.in_cell = false;
+                }
                 b"w:p" => {
                     let text = state.current_para.trim().to_string();
-                    if !text.is_empty() {
+                    if state.in_cell {
+                        if !text.is_empty() {
+                            if !state.current_cell.is_empty() {
+                                state.current_cell.push(' ');
+                            }
+                            state.current_cell.push_str(&text);
+                        }
+                    } else if !text.is_empty() {
                         match state.heading_level {
                             Some(level) => {
                                 let prefix = "#".repeat(level.min(6));

@@ -1,7 +1,8 @@
 use anyhow::Result;
 use std::path::Path;
+use std::process::Command;
 
-pub fn convert(path: &Path) -> Result<String> {
+pub fn convert(path: &Path, ocr: bool) -> Result<String> {
     let filename = path
         .file_name()
         .unwrap_or_default()
@@ -30,7 +31,43 @@ pub fn convert(path: &Path) -> Result<String> {
         }
     }
 
+    if ocr {
+        match run_tesseract(path) {
+            Ok(text) if !text.trim().is_empty() => {
+                output.push_str("\n## OCR Text\n\n");
+                output.push_str(text.trim());
+                output.push('\n');
+            }
+            Ok(_) => {
+                output.push_str("\n*OCR produced no text — image may not contain readable text.*\n");
+            }
+            Err(e) => {
+                output.push_str(&format!("\n*OCR error: {}*\n", e));
+            }
+        }
+    }
+
     Ok(output)
+}
+
+fn run_tesseract(path: &Path) -> Result<String> {
+    let result = Command::new("tesseract")
+        .args([path.to_str().unwrap_or(""), "stdout", "-l", "eng"])
+        .output()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                anyhow::anyhow!("tesseract not found — install tesseract-ocr")
+            } else {
+                anyhow::anyhow!("failed to run tesseract: {}", e)
+            }
+        })?;
+
+    if !result.status.success() {
+        let stderr = String::from_utf8_lossy(&result.stderr);
+        anyhow::bail!("tesseract failed: {}", stderr.trim());
+    }
+
+    Ok(String::from_utf8_lossy(&result.stdout).into_owned())
 }
 
 fn read_exif(path: &Path) -> Result<String> {

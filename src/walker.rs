@@ -4,6 +4,8 @@ use walkdir::WalkDir;
 pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     // Documents
     "pdf", "docx", "doc", "pptx", "ppt", "xlsx", "xls",
+    // Archives
+    "zip",
     // Text-based
     "html", "htm", "csv", "json", "xml", "txt",
     // Images

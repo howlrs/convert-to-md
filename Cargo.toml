@@ -1,6 +1,6 @@
 [package]
 name = "convert-to-md-rs"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["howlrs <sharebook.amazon@gmail.com>"]
 description = "Convert office documents, PDFs, images, and more to Markdown"
@@ -11,6 +11,10 @@ keywords = ["markdown", "converter", "pdf", "docx", "office"]
 [[bin]]
 name = "convert-to-md-rs"
 path = "src/main.rs"
+
+[lib]
+name = "convert_to_md_rs"
+path = "src/lib.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

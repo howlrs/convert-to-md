@@ -8,11 +8,12 @@ mod plain_text;
 mod pptx;
 mod xlsx;
 mod xml;
+mod zip_convert;
 
 use anyhow::Result;
 use std::path::Path;
 
-pub fn convert_file(path: &Path) -> Result<String> {
+pub fn convert_file(path: &Path, ocr: bool) -> Result<String> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -28,8 +29,11 @@ pub fn convert_file(path: &Path) -> Result<String> {
         "txt" => plain_text::convert(path),
         "json" => json::convert(path),
         "xml" => xml::convert(path),
-        "pdf" => pdf::convert(path),
-        "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tiff" | "tif" | "webp" => image::convert(path),
+        "pdf" => pdf::convert(path, ocr),
+        "zip" => zip_convert::convert(path, ocr),
+        "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tiff" | "tif" | "webp" => {
+            image::convert(path, ocr)
+        }
         _ => anyhow::bail!("Unsupported format: .{}", ext),
     }
 }

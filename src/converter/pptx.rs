@@ -60,6 +60,12 @@ struct SlideState {
     in_a_t: bool,
     current_para: String,
     is_title_shape: bool,
+    // table state
+    in_tbl: bool,
+    in_tc: bool,
+    current_cell: String,
+    current_row: Vec<String>,
+    table_row_idx: usize,
 }
 
 impl SlideState {
@@ -69,6 +75,11 @@ impl SlideState {
             in_a_t: false,
             current_para: String::new(),
             is_title_shape: false,
+            in_tbl: false,
+            in_tc: false,
+            current_cell: String::new(),
+            current_row: Vec::new(),
+            table_row_idx: 0,
         }
     }
 }
@@ -85,6 +96,17 @@ fn handle_open(e: &quick_xml::events::BytesStart<'_>, state: &mut SlideState) {
                     }
                 }
             }
+        }
+        b"a:tbl" => {
+            state.in_tbl = true;
+            state.table_row_idx = 0;
+        }
+        b"a:tr" => {
+            state.current_row.clear();
+        }
+        b"a:tc" => {
+            state.in_tc = true;
+            state.current_cell.clear();
         }
         b"a:p" => {
             state.in_a_p = true;
@@ -105,9 +127,44 @@ fn extract_slide_text(xml: &str) -> Result<String> {
             Event::Start(e) => handle_open(&e, &mut state),
             Event::Empty(e) => handle_open(&e, &mut state),
             Event::End(e) => match e.name().as_ref() {
+                b"a:tbl" => {
+                    state.in_tbl = false;
+                    state.in_tc = false;
+                    state.table_row_idx = 0;
+                    output.push('\n');
+                }
+                b"a:tr" => {
+                    if !state.current_row.is_empty() {
+                        output.push_str(&format!("|{}|\n", state.current_row.join("|")));
+                        if state.table_row_idx == 0 {
+                            let sep = state
+                                .current_row
+                                .iter()
+                                .map(|_| "---")
+                                .collect::<Vec<_>>()
+                                .join("|");
+                            output.push_str(&format!("|{}|\n", sep));
+                        }
+                        state.table_row_idx += 1;
+                    }
+                    state.current_row.clear();
+                }
+                b"a:tc" => {
+                    let cell = state.current_cell.replace('|', "\\|");
+                    state.current_row.push(cell.trim().to_string());
+                    state.current_cell.clear();
+                    state.in_tc = false;
+                }
                 b"a:p" => {
                     let text = state.current_para.trim().to_string();
-                    if !text.is_empty() {
+                    if state.in_tc {
+                        if !text.is_empty() {
+                            if !state.current_cell.is_empty() {
+                                state.current_cell.push(' ');
+                            }
+                            state.current_cell.push_str(&text);
+                        }
+                    } else if !text.is_empty() {
                         if state.is_title_shape {
                             output.push_str(&format!("### {}\n\n", text));
                         } else {

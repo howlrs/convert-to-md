@@ -29,4 +29,8 @@ pub struct Cli {
     /// Number of parallel jobs (0 = use all CPU cores)
     #[arg(short, long, default_value = "0")]
     pub jobs: usize,
+
+    /// Enable OCR via tesseract for images and image-based PDFs
+    #[arg(long)]
+    pub ocr: bool,
 }

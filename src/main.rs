@@ -1,6 +1,4 @@
 mod cli;
-mod converter;
-mod walker;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -12,8 +10,8 @@ use colored::Colorize;
 use rayon::prelude::*;
 
 use cli::Cli;
-use converter::convert_file;
-use walker::collect_files;
+use convert_to_md_rs::converter::convert_file;
+use convert_to_md_rs::walker::{collect_files, SUPPORTED_EXTENSIONS};
 
 fn main() {
     if let Err(e) = run() {
@@ -49,7 +47,7 @@ fn run() -> Result<()> {
         );
         println!(
             "  Supported extensions: {}",
-            walker::SUPPORTED_EXTENSIONS
+            SUPPORTED_EXTENSIONS
                 .iter()
                 .map(|e| format!(".{}", e))
                 .collect::<Vec<_>>()
@@ -80,9 +78,10 @@ fn run() -> Result<()> {
     let skip = Arc::new(AtomicUsize::new(0));
     let err = Arc::new(AtomicUsize::new(0));
 
+    let ocr = cli.ocr;
     files.par_iter().for_each(|src| {
         let out_dir = compute_output_dir(src, &cli.input, &cli.output);
-        match process_file(src, &out_dir, cli.overwrite) {
+        match process_file(src, &out_dir, cli.overwrite, ocr) {
             Status::Ok => {
                 ok.fetch_add(1, Ordering::Relaxed);
             }
@@ -131,7 +130,7 @@ fn compute_output_dir(src: &Path, input_base: &Path, output_base: &Path) -> Path
     output_base.to_owned()
 }
 
-fn process_file(src: &Path, out_dir: &Path, overwrite: bool) -> Status {
+fn process_file(src: &Path, out_dir: &Path, overwrite: bool, ocr: bool) -> Status {
     let stem = src.file_stem().unwrap_or_default().to_string_lossy();
     let dest = out_dir.join(format!("{}.md", stem));
 
@@ -144,7 +143,7 @@ fn process_file(src: &Path, out_dir: &Path, overwrite: bool) -> Status {
         return Status::Skip;
     }
 
-    match convert_file(src) {
+    match convert_file(src, ocr) {
         Ok(content) if content.trim().is_empty() => {
             println!(
                 "  {} {} → conversion result is empty",
