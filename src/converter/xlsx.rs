@@ -16,7 +16,7 @@ pub fn convert(path: &Path) -> Result<String> {
     let sheet_names: Vec<String> = workbook.sheet_names().to_owned();
 
     for sheet_name in &sheet_names {
-        match workbook.worksheet_range(&sheet_name) {
+        match workbook.worksheet_range(sheet_name) {
             Ok(range) => {
                 output.push_str(&format!("## {}\n\n", sheet_name));
 
