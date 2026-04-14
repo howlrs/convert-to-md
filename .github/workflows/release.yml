@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  BIN_NAME: convert-to-md-rs
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 — static binary (musl)
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            asset_suffix: linux-x86_64
+            ext: ""
+            install_deps: |
+              sudo apt-get update -qq
+              sudo apt-get install -y --no-install-recommends musl-tools poppler-utils
+
+          # Windows x86_64 — cross-compile via mingw
+          - name: windows-x86_64
+            os: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+            asset_suffix: windows-x86_64
+            ext: ".exe"
+            install_deps: |
+              sudo apt-get update -qq
+              sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install system dependencies
+        run: ${{ matrix.install_deps }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package artifact
+        id: package
+        run: |
+          BIN_PATH="target/${{ matrix.target }}/release/${{ env.BIN_NAME }}${{ matrix.ext }}"
+          ARCHIVE="${{ env.BIN_NAME }}-${{ github.ref_name }}-${{ matrix.asset_suffix }}"
+
+          if [[ "${{ matrix.ext }}" == ".exe" ]]; then
+            zip "${ARCHIVE}.zip" "${BIN_PATH}"
+            echo "asset=${ARCHIVE}.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar czf "${ARCHIVE}.tar.gz" -C "$(dirname ${BIN_PATH})" "$(basename ${BIN_PATH})"
+            echo "asset=${ARCHIVE}.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload artifact for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ steps.package.outputs.asset }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) | sort | while read f; do
+            sha256sum "$f"
+          done | tee ../checksums.txt
+          cp ../checksums.txt .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: |
+            ## convert-to-md-rs ${{ github.ref_name }}
+
+            ### Downloads / ダウンロード
+
+            | Platform | File |
+            |----------|------|
+            | Linux x86_64 (static) | `*-linux-x86_64.tar.gz` |
+            | Windows x86_64 | `*-windows-x86_64.zip` |
+
+            ### Usage / 使い方
+
+            **Linux:**
+            ```bash
+            tar xzf convert-to-md-rs-*-linux-x86_64.tar.gz
+            ./convert-to-md-rs --input resources/ --output data/output/markdown/
+            ```
+
+            **Windows (PowerShell):**
+            ```powershell
+            Expand-Archive convert-to-md-rs-*-windows-x86_64.zip .
+            .\convert-to-md-rs.exe --input resources --output data\output\markdown
+            ```
+
+            **Docker (Windows & Linux):**
+            ```bash
+            ./scripts/convert.sh
+            ```
+
+            See [README](https://github.com/howlrs/convert-to-md#readme) for full documentation.
+
+            ### Checksums (SHA-256)
+            See `checksums.txt` attached below.
+          files: |
+            dist/**/*.tar.gz
+            dist/**/*.zip
+            checksums.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}

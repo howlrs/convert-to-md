@@ -8,8 +8,8 @@ WORKDIR /app
 # Cache dependencies separately
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p src && echo "fn main(){}" > src/main.rs && \
-    cargo build --release 2>/dev/null || true && \
-    rm -rf src
+    cargo build --release && \
+    rm -rf src target/release/convert-to-md-rs target/release/deps/convert*
 
 COPY src ./src
 RUN cargo build --release
