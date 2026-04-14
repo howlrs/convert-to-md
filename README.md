@@ -1,6 +1,7 @@
 # convert-to-md-rs
 
 [![CI](https://github.com/howlrs/convert-to-md/actions/workflows/ci.yml/badge.svg)](https://github.com/howlrs/convert-to-md/actions)
+[![Release](https://img.shields.io/github/v/release/howlrs/convert-to-md)](https://github.com/howlrs/convert-to-md/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > **[日本語版 README](README.ja.md)**
@@ -16,6 +17,25 @@ Runs via Docker — no Python or runtime dependencies on the host.
 | Spreadsheets | `.xlsx`, `.xls` |
 | Web / Text | `.html`, `.htm`, `.csv`, `.json`, `.xml`, `.txt` |
 | Images | `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.tiff`, `.webp` |
+
+## Download
+
+Pre-built binaries are available on the [Releases page](https://github.com/howlrs/convert-to-md/releases/latest).
+
+| Platform | File |
+|----------|------|
+| Linux x86_64 (static) | `convert-to-md-rs-*-linux-x86_64.tar.gz` |
+| Windows x86_64 | `convert-to-md-rs-*-windows-x86_64.zip` |
+
+```bash
+# Linux: extract and run
+tar xzf convert-to-md-rs-*-linux-x86_64.tar.gz
+./convert-to-md-rs --input resources/ --output data/output/markdown/
+
+# Windows (PowerShell): extract and run
+Expand-Archive convert-to-md-rs-*-windows-x86_64.zip .
+.\convert-to-md-rs.exe --input resources --output data\output\markdown
+```
 
 ## Quick Start
 
