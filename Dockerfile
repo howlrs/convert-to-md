@@ -11,7 +11,7 @@ RUN mkdir -p src && \
     echo "fn main(){}" > src/main.rs && \
     echo "" > src/lib.rs && \
     cargo build --release && \
-    rm -rf src target/release/convert-to-md-rs target/release/deps/convert*
+    rm -rf src target/release/convert-to-md-rs target/release/deps/convert* target/release/deps/libconvert*
 
 COPY src ./src
 RUN cargo build --release
